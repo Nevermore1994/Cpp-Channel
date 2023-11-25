@@ -152,7 +152,7 @@ private:
 
 
 template <typename T>
-class Sender final : public std::__range_adaptor_closure<Sender<T>>{
+class Sender final {
 public:
     using ValueType = T;
     explicit Sender(std::shared_ptr<Channel<T>> channel)

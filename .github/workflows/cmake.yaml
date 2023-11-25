@@ -33,6 +33,20 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
+      - name: Set Compiler
+        run: |
+          case $(uname | tr '[:upper:]' '[:lower:]') in
+            linux*)
+              export CC=`/usr/local/bin/gcc-13.1.0`
+              export CXX=`/usr/local/bin/g++-13.1.0`
+              ;;
+            darwin*)
+              export CC=$(brew --prefix llvm@15)/bin/clang
+              export CXX=$(brew --prefix llvm@15)/bin/clang++
+              ;;
+            *)
+              ;;
+          esac
 
       - name: Create Build Environment
         # Some projects don't allow in-source building, so create a separate build directory
