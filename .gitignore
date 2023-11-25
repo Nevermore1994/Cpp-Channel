@@ -30,3 +30,6 @@
 *.exe
 *.out
 *.app
+cmake-build-debug/_deps/googletest-subbuild
+cmake-build-debug
+.idea
