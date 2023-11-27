@@ -4,7 +4,9 @@
 #include <random>
 #include <thread>
 #include "Channel.hpp"
+
 using namespace Async;
+using namespace std::string_literals;
 
 int32_t randomCommon(int32_t min, int32_t max) {
     std::random_device rd;
@@ -37,29 +39,40 @@ struct People {
         , id(id_) {
 
     }
+    People() = default;
 };
+
 
 int main() {
     using type = std::unordered_map<int, People>;
     auto [sp, rp] = Channel<People>::create();
-    std::thread t([rp = std::move(rp)]{
-        //block
-        for (auto& res : *rp) {
-            auto& people = *res;
-            std::cout << " receive interval:" << (timestamp() - people.timestamp)
-                << "ns, age:" << people.age << ", id:" << people.id << std::endl;
-        }
-//        for (;;) {
-//            auto res = rp->tryReceive(); // No blocking
-//            auto res = rp->receive(); // block
-//            auto res = rp->tryReceiveAll(); //No blocking
+    std::thread t([rp = std::move(rp)] {
+//        //can use for range
+//        for (auto& people : *rp) {
+//            std::cout << " receive interval:" << (timestamp() - people.timestamp)
+//                << "ns, age:" << people.age << ", id:" << people.id << std::endl;
+//        }
+
+        //can use ranges
+//        auto func = [](auto& ex) {
+//            return ex.id % 2 == 0;
+//        };
+//        for (const auto& people : *rp | std::views::filter(func)) {
+//           std::cout << " receive interval:" << (timestamp() - people.timestamp) << "ns, age:" << people.age << ", id:" << people.id << std::endl;
+//        }
+
+        //can use STL algorithm
+//        std::vector<People> values;
+//        std::move(rp->begin(), rp->end(), std::back_inserter(values));
+//        for(auto& people: values) {
+//            std::cout << " receive interval:" << (timestamp() - people.timestamp) << "ns, age:" << people.age << ", id:"
+//                      << people.id << std::endl;
 //        }
     });
+
     //send single message
     sp->send(People{timestamp(), randomAge(), randomId()});
-    sp->send(People{timestamp(), randomAge(), randomId()});
-    sp << People{timestamp(), randomAge(), randomId()};
-    sp << (People{timestamp(), randomAge(), randomId()});
+    sp << People{timestamp(), randomAge(), randomId()} << (People{timestamp(), randomAge(), randomId()});
 
     //send multi message
     std::vector<People> peoples;
@@ -73,8 +86,13 @@ int main() {
     for(int i = 0; i < 10; i++) {
         peoples.emplace_back(timestamp(), randomAge(), randomId());
     }
+
+    //can use ranges
     sp << (peoples | std::views::take(3)); // << higher priority than |
-    peoples | std::views::drop(4) | SenderView(sp); // SenderView
+    for (bool p : peoples | std::views::drop(4) | SenderView(sp)){
+        //p = true, send success
+        std::cout << "send ranges:" << std::boolalpha << p << std::endl;
+    };
     sp->done();
     t.join();
     return 0;

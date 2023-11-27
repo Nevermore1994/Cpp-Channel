@@ -47,6 +47,12 @@ concept IsSender = requires(T&& t) {
     std::forward<T>(t)->done();
 };
 
+template <typename T>
+concept IsReceiver = std::ranges::range<T> && requires(T&& t) {
+    typename T::ValueType;
+    std::forward<T>(t).tryReceive();
+};
+
 template <IsSender S>
 struct SenderAdaptorClosure {
 private:
@@ -58,8 +64,8 @@ public:
 
     template <std::ranges::viewable_range InputView>
     friend auto operator|(InputView &&lhs, SenderAdaptorClosure<S> self) {
-        self.sender_->send(lhs);
-        return std::ranges::empty_view<int>();
+        auto res = self.sender_->send(std::forward<InputView>(lhs));
+        return std::ranges::single_view<bool>(res);
     }
 };
 
@@ -79,20 +85,13 @@ template <typename T>
 class Receiver;
 
 template <typename T>
-struct DestroyReceiver {
-    void operator()(Receiver<T>* receiver) {
-        delete receiver;
-    }
-};
-
-template <typename T>
 using SenderPtr = std::unique_ptr<Sender<T>>;
 
 template <typename T>
 using SenderRefPtr = std::shared_ptr<Sender<T>>;
 
 template <typename T>
-using ReceiverPtr = std::unique_ptr<Receiver<T>, decltype(DestroyReceiver<T>())>;
+using ReceiverPtr = std::unique_ptr<Receiver<T>>;
 
 enum class ChannelEventType {
     Unknown,
@@ -113,9 +112,7 @@ public:
         auto p = std::shared_ptr<Channel<T>>(new Channel<T>(), [](Channel<T>* channel) {
             delete channel;
         });
-        return {std::make_unique<Sender<T>>(p),
-                ReceiverPtr<T>(new Receiver<T>(p), DestroyReceiver<T>())
-        };
+        return { std::make_unique<Sender<T>>(p), std::make_unique<Receiver<T>>(p) };
     }
 
     inline auto done() noexcept -> void {
@@ -317,20 +314,19 @@ template <typename T>
 class ReceiverIterator;
 
 template <typename T>
-class Receiver final {
+class ConstReceiverIterator;
+
+template <typename T>
+class Receiver final : public std::ranges::view_interface<Receiver<T>>{
 private:
-    friend class DestroyReceiver<T>;
-
     friend class ReceiverIterator<T>;
-
+    friend class ConstReceiverIterator<T>;
 private:
     class ReceiverImpl {
     public:
         friend class Channel<T>;
 
         friend class ReceiverIterator<T>;
-
-        friend class DestroyReceiver<T>;
 
         explicit ReceiverImpl(std::shared_ptr<Channel<T>> channel)
             : channel_(channel) {
@@ -341,9 +337,23 @@ private:
             channel_->done();
         }
 
-        ReceiverImpl& operator=(const ReceiverImpl&) = delete;
+        inline auto operator=(const ReceiverImpl& src) noexcept -> ReceiverImpl& {
+            channel_ = src.channel_;
+        }
 
-        ReceiverImpl(const ReceiverImpl&) = delete;
+        ReceiverImpl(const ReceiverImpl& src) noexcept
+            : channel_(src.channel_) {
+
+        }
+
+        inline auto operator=(ReceiverImpl&& src) noexcept -> ReceiverImpl& {
+            channel_ = std::move(src.channel_);
+        }
+
+        ReceiverImpl(ReceiverImpl&& src) noexcept
+            : channel_(std::move(src.channel_)) {
+
+        }
 
         inline auto receive() noexcept -> std::expected<T, ChannelEventType> {
             std::unique_lock<std::mutex> lock(channel_->mutex_);
@@ -387,11 +397,7 @@ private:
         std::shared_ptr<Channel<T>> channel_;
     };//end of class ReceiverImpl
 
-private:
     std::shared_ptr<ReceiverImpl> impl_;
-
-private:
-    ~Receiver() = default;
 
 public:
     using ValueType = T;
@@ -400,12 +406,30 @@ public:
 
     }
 
-    Receiver<T>& operator=(const Receiver<T>&) = delete;
+    ~Receiver() noexcept = default;
 
-    Receiver(const Receiver<T>&) = delete;
+    inline auto operator=(const Receiver<T>& src) -> Receiver<T>& {
+        impl_ = src.impl_;
+    }
+
+    Receiver(const Receiver<T>& src) noexcept
+        : impl_(src.impl_) {
+
+    }
+
+    inline auto operator=(Receiver<T>&& src) noexcept -> Receiver<T>& {
+        impl_ = std::move(src.impl_);
+    }
+
+    Receiver(Receiver<T>&& src) noexcept
+        : impl_(std::move(src.impl_)) {
+
+    }
 
     inline auto begin() noexcept -> ReceiverIterator<T> {
-        return ReceiverIterator<T>(impl_, ChannelEventType::Unknown);
+        auto it = ReceiverIterator<T>(impl_, ChannelEventType::Unknown);
+        it.value_ = impl_->receive();
+        return it;
     }
 
     inline auto end() noexcept -> ReceiverIterator<T> {
@@ -423,24 +447,22 @@ public:
     inline auto tryReceiveAll() noexcept -> std::list<T> {
         return impl_->tryReceiveAll();
     }
+
 }; //end of class Receiver
 
 template <typename T>
 class ReceiverIterator {
+    friend class Receiver<T>;
 protected:
     std::shared_ptr<typename Receiver<T>::ReceiverImpl> receiverImpl_;
-    std::expected<T, ChannelEventType> value_;
-private:
-    inline auto getValue() noexcept -> std::expected<T, ChannelEventType>& {
-        if (!value_.has_value() && value_.error() == ChannelEventType::Unknown) {
-            value_ = std::move(receiverImpl_->receive());
-        }
-        return value_;
-    }
+    mutable std::expected<T, ChannelEventType> value_;
 
 public:
     using iterator_category = std::input_iterator_tag;
-    using value_type = std::expected<T, ChannelEventType>;
+    using value_type = T;
+    using difference_type = std::ptrdiff_t;
+    using pointer = T*;
+    using reference = T&;
 
     explicit ReceiverIterator(std::shared_ptr<typename Receiver<T>::ReceiverImpl> receiverImpl,
                               ChannelEventType eventType = ChannelEventType::Unknown)
@@ -449,34 +471,58 @@ public:
 
     }
 
-    ReceiverIterator(const ReceiverIterator&) = delete;
+    ReceiverIterator()
+        : receiverImpl_(nullptr)
+        , value_(std::unexpected(ChannelEventType::Closed)) {
 
-    ReceiverIterator& operator=(const ReceiverIterator&) = delete;
+    }
 
-    ReceiverIterator(ReceiverIterator&& src) noexcept
+    template <typename = std::enable_if_t<std::is_copy_constructible_v<T>>>
+    explicit ReceiverIterator(const ReceiverIterator& src) noexcept
+        : receiverImpl_(src.receiverImpl_)
+        , value_(src.value_) {
+
+    }
+
+    template <typename = std::enable_if_t<std::is_copy_assignable_v<T>>>
+    ReceiverIterator& operator=(const ReceiverIterator& src) noexcept {
+        receiverImpl_ = src.receiverImpl_;
+        value_ = src.value_;
+        return *this;
+    }
+
+    template <typename = std::enable_if_t<std::is_move_constructible_v<T>>>
+    explicit ReceiverIterator(ReceiverIterator&& src) noexcept
         : receiverImpl_(std::move(src.receiverImpl_))
         , value_(std::move(src.value_)) {
 
     }
 
+    template <typename = std::enable_if_t<std::is_move_assignable_v<T>>>
     inline auto operator=(ReceiverIterator&& src) noexcept -> ReceiverIterator& {
         receiverImpl_ = std::move(src.receiverImpl_);
         value_ = std::move(src.value_);
         return *this;
     }
 
-    inline auto operator*() noexcept -> std::expected<T, ChannelEventType>& {
-        return getValue();
+    inline auto operator*() const noexcept -> reference {
+        return *value_;
     }
 
     inline auto operator++() noexcept -> ReceiverIterator& {
-        getValue();
         value_ = std::move(receiverImpl_->receive());
         return *this;
     }
 
-    inline auto operator==(const ReceiverIterator& iter) noexcept -> bool {
-        const auto& lvalue = getValue();
+    inline auto operator++(int) noexcept -> ReceiverIterator {
+        auto temp = std::move(*this);
+        *this = ReceiverIterator(receiverImpl_);
+        this->value_ = receiverImpl_->receive();
+        return temp;
+    }
+
+    inline auto operator==(const ReceiverIterator& iter) const noexcept -> bool {
+        const auto& lvalue = value_;
         const auto& rvalue = iter.value_;
         if (lvalue.has_value() && rvalue.has_value()) {
             return &lvalue.value() == &rvalue.value();
@@ -487,7 +533,7 @@ public:
         return lvalue.error() == rvalue.error();
     }
 
-    inline auto operator!=(const ReceiverIterator& iter) noexcept -> bool {
+    inline auto operator!=(const ReceiverIterator& iter) const noexcept -> bool {
         return !operator==(iter);
     }
 }; //end of class ReceiverIterator

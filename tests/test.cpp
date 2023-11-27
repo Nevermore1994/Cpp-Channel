@@ -125,7 +125,7 @@ TEST(ChannelTest, Range) {
     std::thread t1([rp = std::move(rp)]{
         type value = 0;
         for(auto res : *rp) {
-            EXPECT_EQ(*res, value);
+            EXPECT_EQ(res, value);
             value++;
         }
     });
@@ -234,7 +234,7 @@ TEST(ChannelTest, ImplicitConversion) {
     std::thread t1([rp = std::move(rp)]{
         int value = 0;
         for(auto res : *rp) {
-            EXPECT_EQ(res.value().value, value);
+            EXPECT_EQ(res.value, value);
             value++;
         }
     });
