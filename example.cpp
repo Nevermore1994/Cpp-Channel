@@ -62,12 +62,12 @@ int main() {
 //        }
 
         //can use STL algorithm
-//        std::vector<People> values;
-//        std::move(rp->begin(), rp->end(), std::back_inserter(values));
-//        for(auto& people: values) {
-//            std::cout << " receive interval:" << (timestamp() - people.timestamp) << "ns, age:" << people.age << ", id:"
-//                      << people.id << std::endl;
-//        }
+        std::vector<People> values;
+        std::move(rp->begin(), rp->end(), std::back_inserter(values));
+        for(auto& people: values) {
+            std::cout << " receive interval:" << (timestamp() - people.timestamp) << "ns, age:" << people.age << ", id:"
+                      << people.id << std::endl;
+        }
     });
 
     //send single message

@@ -317,7 +317,7 @@ template <typename T>
 class ConstReceiverIterator;
 
 template <typename T>
-class Receiver final : public std::ranges::view_interface<Receiver<T>>{
+class Receiver final {
 private:
     friend class ReceiverIterator<T>;
     friend class ConstReceiverIterator<T>;
