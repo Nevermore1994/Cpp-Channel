@@ -68,7 +68,7 @@ You just need to include the header file
         return num % 2 == 0;
     };
     for (const auto& num : *rp | std::views::filter(func)) {
-        std::cout << res << std::endl;
+        std::cout << num << std::endl;
     }
     
     std::vector<int> values;
@@ -88,3 +88,7 @@ You just need to include the header file
 ```
 
 For specific usage, please refer to [example.cpp](./example.cpp)
+
+If you cannot support C++23, you can refer to [cpp-channel][def]
+
+[def]: https://github.com/andreiavrammsd/cpp-channel
