@@ -20,15 +20,18 @@
 
 namespace Async {
 
-template <typename S>
-concept IsString = requires(S&& s) {
-    std::forward<S>(s).c_str();
-};
+template <typename T>
+struct IsSTLStringImpl : public std::false_type {};
+
+template <typename T>
+struct IsSTLStringImpl<std::basic_string<T>> : public std::true_type {};
+
+template <typename T>
+inline constexpr auto IsSTLString = IsSTLStringImpl<T>::value;
 
 template <typename C>
-concept IsContainerOrRange = std::ranges::viewable_range<C> &&
-    (!IsString<C>) &&
-    requires(C&& c) {
+concept IsRange = std::ranges::viewable_range<C> &&
+    (!IsSTLString<C>) && requires(C&& c) {
         std::forward<C>(c).empty();
         typename decltype(c.begin())::value_type;
     };
@@ -42,18 +45,42 @@ struct GetChannelType {
 };
 
 template <typename T>
-concept IsSender = requires(T&& t) {
+class Sender;
+
+template <typename T>
+class Receiver;
+
+template <typename T>
+struct IsSenderImpl : public std::false_type {};
+
+template <typename T>
+struct IsSenderImpl<Sender<T>> : public std::true_type {};
+
+template <typename T>
+inline constexpr auto IsSender = IsSenderImpl<T>::value;
+
+template <typename T>
+concept IsSenderPtr = requires(T&& t) {
     typename T::element_type::ValueType;
-    std::forward<T>(t)->done();
+    IsSender<typename T::element_type>;
 };
 
 template <typename T>
-concept IsReceiver = std::ranges::range<T> && requires(T&& t) {
-    typename T::ValueType;
-    std::forward<T>(t).tryReceive();
+struct IsReceiverImpl : public std::false_type {};
+
+template <typename T>
+struct IsReceiverImpl<Receiver<T>> : public std::true_type {};
+
+template <typename T>
+inline constexpr auto IsReceiver = IsReceiverImpl<T>::value;
+
+template <typename T>
+concept IsReceiverPtr = requires(T&& t) {
+    typename T::element_type::ValueType;
+    IsReceiver<typename T::element_type>;
 };
 
-template <IsSender S>
+template <IsSenderPtr S>
 struct SenderAdaptorClosure {
 private:
     S& sender_;
@@ -70,7 +97,7 @@ public:
 };
 
 struct SendView {
-    template <IsSender S>
+    template <IsSenderPtr S>
     auto operator()(S& sender) const {
         return SenderAdaptorClosure(sender);
     }
@@ -78,11 +105,6 @@ struct SendView {
 
 inline constexpr SendView SenderView;
 
-template <typename T>
-class Sender;
-
-template <typename T>
-class Receiver;
 
 template <typename T>
 using SenderPtr = std::unique_ptr<Sender<T>>;
@@ -172,7 +194,7 @@ public:
 
     template <typename I, typename = std::enable_if_t<std::movable<T>> >
     inline auto send(const I& box) noexcept -> bool
-        requires IsContainerOrRange<I> && std::is_convertible_v<typename decltype(box.begin())::value_type, T>  {
+        requires IsRange<I> && std::is_convertible_v<typename decltype(box.begin())::value_type, T>  {
         if (box.empty()) {
             return true;
         }
@@ -189,7 +211,7 @@ public:
 
     template <typename I, typename = std::enable_if_t<std::movable<T>> >
     inline auto send(I&& box) noexcept -> bool
-        requires IsContainerOrRange<I> && std::is_convertible_v<typename decltype(box.begin())::value_type, T> {
+        requires IsRange<I> && std::is_convertible_v<typename decltype(box.begin())::value_type, T> {
         if (box.empty()) {
             return true;
         }
@@ -258,7 +280,7 @@ auto operator<<(const SenderPtr<U>& sender, const T& message) -> const SenderPtr
 
 template <typename I, typename U>
 auto operator<<(const SenderPtr<U>& sender, const I& box) -> const SenderPtr<U>&
-    requires IsContainerOrRange<I> && std::is_convertible_v<typename decltype(box.begin())::value_type, U> {
+    requires IsRange<I> && std::is_convertible_v<typename decltype(box.begin())::value_type, U> {
     if (!sender->send(box)) {
         throw std::runtime_error(kClosedMessage.data());
     }
@@ -267,7 +289,7 @@ auto operator<<(const SenderPtr<U>& sender, const I& box) -> const SenderPtr<U>&
 
 template <typename I, typename U>
 auto operator<<(const SenderPtr<U>& sender, I&& box) -> const SenderPtr<U>&
-    requires IsContainerOrRange<I> && std::is_convertible_v<typename decltype(box.begin())::value_type, U> {
+    requires IsRange<I> && std::is_convertible_v<typename decltype(box.begin())::value_type, U> {
     if (!sender->send(std::forward<I>(box))) {
         throw std::runtime_error(kClosedMessage.data());
     }
@@ -294,7 +316,7 @@ auto operator<<(const SenderRefPtr<U>& sender, const T& message) -> const Sender
 
 template <typename I, typename U>
 auto operator<<(const SenderRefPtr<U>& sender, const I& box) -> const SenderRefPtr<U>&
-    requires IsContainerOrRange<I> && std::is_convertible_v<typename decltype(box.begin())::value_type, U> {
+    requires IsRange<I> && std::is_convertible_v<typename decltype(box.begin())::value_type, U> {
     if (!sender->send(box)) {
         throw std::runtime_error(kClosedMessage.data());
     }
@@ -303,7 +325,7 @@ auto operator<<(const SenderRefPtr<U>& sender, const I& box) -> const SenderRefP
 
 template <typename I, typename U>
 auto operator<<(const SenderRefPtr<U>& sender, I&& box) -> const SenderRefPtr<U>&
-    requires IsContainerOrRange<I> && std::is_convertible_v<typename decltype(box.begin())::value_type, U> {
+    requires IsRange<I> && std::is_convertible_v<typename decltype(box.begin())::value_type, U> {
     if (!sender->send(std::forward<I>(box))) {
         throw std::runtime_error(kClosedMessage.data());
     }

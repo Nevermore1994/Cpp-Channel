@@ -1,8 +1,5 @@
 # Cpp-Channel
 
-
-# Channel
-
 [![build](https://github.com/Nevermore1994/Cpp-Channel/workflows/build/badge.svg)](https://github.com/Nevermore1994/Cpp-Channel/actions)
 
 ### Thread-safe container for sharing data between threads. Header-only.
@@ -13,9 +10,9 @@
 * Support Ranges
 * No blocking or blocking fetch.
 * Range-based for loop supported.
-* If the sender or any receiver is released, the channel will be closed
+* If the sender or receiver is released, the channel will be closed
 * Integrates well with STL algorithms in some cases. Eg: std::move(rp->begin(), rp->end(), ...).
-* Tested with GCC(GCC 13), Clang(LLVM 16), and MSVC(VS 2022).
+* Tested with GCC(gcc 13), Clang(LLVM 16 and XCode15.0), and MSVC(Visual Studio 2022).
 
 ## Requirements
 
@@ -23,7 +20,7 @@
 
 ## Installation
 
-You just need to include the header file
+You just need to include the header file [Channel.hpp](Channel.hpp)
 
 ## Usage
 
@@ -44,7 +41,7 @@ You just need to include the header file
     // or sp->send(nums);
     
     //use ranges
-    sp << (nums | std::views::take(3)); // << higher priority than |
+    sp << (nums | std::views::take(3)); // << operator higher priority than | operator
     // or sp->send(nums | std::views::take(3));
 
     //use | operator
@@ -74,7 +71,7 @@ You just need to include the header file
     std::vector<int> values;
     //use STL algorithm, blocking
     std::move(rp->begin(), rp->end(), std::back_inserter(values));
-    for(auto& res: values) {
+    for (const auto& res: values) {
         std::cout << res << std::endl;
     }
     
@@ -84,7 +81,10 @@ You just need to include the header file
 ```C++
     auto [sp, rp] = Channel<int>::create();
     auto res = rp->tryReceive(); // No blocking
-    auto res = rp->tryReceiveAll(); //No blocking
+    //No blocking
+    for (const auto& res : rp->tryReceiveAll()) {
+        std::cout << res << std::endl;  
+    }
 ```
 
 For specific usage, please refer to [example.cpp](./example.cpp)

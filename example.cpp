@@ -3,6 +3,7 @@
 #include <unordered_map>
 #include <random>
 #include <thread>
+#include <algorithm>
 #include "Channel.hpp"
 
 using namespace Async;
@@ -63,11 +64,10 @@ int main() {
 
         //can use STL algorithm
         std::vector<People> values;
-        std::move(rp->begin(), rp->end(), std::back_inserter(values));
-        for(auto& people: values) {
+        std::for_each(rp->begin(), rp->end(), [](auto& people) {
             std::cout << " receive interval:" << (timestamp() - people.timestamp) << "ns, age:" << people.age << ", id:"
                       << people.id << std::endl;
-        }
+        });
     });
 
     //send single message
