@@ -43,9 +43,9 @@ struct People {
     People() = default;
 };
 
-
 int main() {
     using type = std::unordered_map<int, People>;
+    using namespace std::chrono_literals;
     auto [sp, rp] = Channel<People>::create();
     std::thread t([rp = std::move(rp)] {
 //        //can use for range
@@ -73,7 +73,7 @@ int main() {
     //send single message
     sp->send(People{timestamp(), randomAge(), randomId()});
     sp << People{timestamp(), randomAge(), randomId()} << (People{timestamp(), randomAge(), randomId()});
-
+    std::this_thread::sleep_for(1s);
     //send multi message
     std::vector<People> peoples;
     peoples.reserve(10);
@@ -86,7 +86,7 @@ int main() {
     for(int i = 0; i < 10; i++) {
         peoples.emplace_back(timestamp(), randomAge(), randomId());
     }
-
+    std::this_thread::sleep_for(1s);
     //can use ranges
     sp << (peoples | std::views::take(3)); // << higher priority than |
     for (bool p : peoples | std::views::drop(4) | SenderView(sp)){

@@ -258,13 +258,17 @@ private:
     std::shared_ptr<Channel<T>> channel_;
 };
 
-constexpr std::string_view kClosedMessage = "can't send message to closed channel.";
+namespace _detail {
+    auto closedHandler = []{
+        throw std::runtime_error("can't send message to closed channel.");
+    };
+}
 
 template <typename T, typename U>
 auto operator<<(const SenderPtr<U>& sender, T&& message) -> const SenderPtr<U>&
     requires std::movable<T> && std::is_convertible_v<T, U> {
     if (!sender->send(std::forward<T>(message))) {
-        throw std::runtime_error(kClosedMessage.data());
+        _detail::closedHandler();
     }
     return sender;
 }
@@ -273,7 +277,7 @@ template <typename T, typename U>
 auto operator<<(const SenderPtr<U>& sender, const T& message) -> const SenderPtr<U>&
     requires std::copyable<T> && std::is_convertible_v<T, U> {
     if (!sender->send(message)) {
-        throw std::runtime_error(kClosedMessage.data());
+        _detail::closedHandler();
     }
     return sender;
 }
@@ -282,7 +286,7 @@ template <typename I, typename U>
 auto operator<<(const SenderPtr<U>& sender, const I& box) -> const SenderPtr<U>&
     requires IsRange<I> && std::is_convertible_v<typename decltype(box.begin())::value_type, U> {
     if (!sender->send(box)) {
-        throw std::runtime_error(kClosedMessage.data());
+        _detail::closedHandler();
     }
     return sender;
 }
@@ -291,7 +295,7 @@ template <typename I, typename U>
 auto operator<<(const SenderPtr<U>& sender, I&& box) -> const SenderPtr<U>&
     requires IsRange<I> && std::is_convertible_v<typename decltype(box.begin())::value_type, U> {
     if (!sender->send(std::forward<I>(box))) {
-        throw std::runtime_error(kClosedMessage.data());
+        _detail::closedHandler();
     }
     return sender;
 }
@@ -300,7 +304,7 @@ template <typename T, typename U>
 auto operator<<(const SenderRefPtr<U>& sender, T&& message) -> const SenderRefPtr<U>&
     requires std::movable<T> && std::is_convertible_v<T, U> {
     if (!sender->send(std::forward<T>(message))) {
-        throw std::runtime_error(kClosedMessage.data());
+        _detail::closedHandler();
     }
     return sender;
 }
@@ -309,7 +313,7 @@ template <typename T, typename U>
 auto operator<<(const SenderRefPtr<U>& sender, const T& message) -> const SenderRefPtr<U>&
     requires std::copyable<U> && std::is_convertible_v<T, U> {
     if (!sender->send(message)) {
-        throw std::runtime_error(kClosedMessage.data());
+        _detail::closedHandler();
     }
     return sender;
 }
@@ -318,7 +322,7 @@ template <typename I, typename U>
 auto operator<<(const SenderRefPtr<U>& sender, const I& box) -> const SenderRefPtr<U>&
     requires IsRange<I> && std::is_convertible_v<typename decltype(box.begin())::value_type, U> {
     if (!sender->send(box)) {
-        throw std::runtime_error(kClosedMessage.data());
+        _detail::closedHandler();
     }
     return sender;
 }
@@ -327,7 +331,7 @@ template <typename I, typename U>
 auto operator<<(const SenderRefPtr<U>& sender, I&& box) -> const SenderRefPtr<U>&
     requires IsRange<I> && std::is_convertible_v<typename decltype(box.begin())::value_type, U> {
     if (!sender->send(std::forward<I>(box))) {
-        throw std::runtime_error(kClosedMessage.data());
+        _detail::closedHandler();
     }
     return sender;
 }
@@ -507,7 +511,7 @@ public:
     }
 
     template <typename = std::enable_if_t<std::is_copy_assignable_v<T>>>
-    ReceiverIterator& operator=(const ReceiverIterator& src) noexcept {
+    auto operator=(const ReceiverIterator& src) noexcept -> ReceiverIterator& {
         receiverImpl_ = src.receiverImpl_;
         value_ = src.value_;
         return *this;

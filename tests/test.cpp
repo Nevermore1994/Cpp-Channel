@@ -230,18 +230,22 @@ struct B {
 
 TEST(ChannelTest, ImplicitConversion) {
     using type = A;
-    auto [sp, rp] = Channel<type>::create();
+    auto [sp, rp] = Channel<type*>::create();
     std::thread t1([rp = std::move(rp)]{
         int value = 0;
         for(auto res : *rp) {
-            EXPECT_EQ(res.value, value);
+            auto k = static_cast<TestValue*>(res);
+            EXPECT_EQ(k->value, value);
+            EXPECT_EQ(k->key, std::to_string(value));
             value++;
+            delete res;
         }
     });
-    std::vector<TestValue> values;
+    std::vector<TestValue*> values;
     for (int i = 0; i < 10; i++) {
-        TestValue value;
-        value.value = i;
+        auto value = new TestValue();
+        value->value = i;
+        value->key = std::to_string(i);
         values.emplace_back(value);
     }
     sp << values;
