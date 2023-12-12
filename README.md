@@ -45,7 +45,7 @@ You just need to include the header file [Channel.hpp](Channel.hpp)
     // or sp->send(nums | std::views::take(3));
 
     //use | operator
-    for (bool res : nums | std::views::drop(4) | SenderView(sp)){
+    for (bool res : nums | std::views::drop(4) | std::views::sender(sp) ){
         //p = true, send success
         std::cout << "send result:" << std::boolalpha << res << std::endl;
     }
