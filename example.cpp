@@ -40,7 +40,6 @@ struct People {
         , id(id_) {
 
     }
-    People() = default;
 };
 
 int main() {
@@ -48,13 +47,13 @@ int main() {
     using namespace std::chrono_literals;
     auto [sp, rp] = Channel<People>::create();
     std::thread t([rp = std::move(rp)] {
-//        //can use for range
+         //can use for range
 //        for (auto& people : *rp) {
 //            std::cout << " receive interval:" << (timestamp() - people.timestamp)
 //                << "ns, age:" << people.age << ", id:" << people.id << std::endl;
 //        }
 
-        //can use ranges
+         //can use ranges
 //        auto func = [](auto& ex) {
 //            return ex.id % 2 == 0;
 //        };
@@ -81,6 +80,8 @@ int main() {
         peoples.emplace_back(timestamp(), randomAge(), randomId());
     }
     sp << peoples;
+    //emplace back
+    sp->emplace(timestamp(), randomAge(), randomId());
 
     peoples.clear();
     for(int i = 0; i < 10; i++) {
@@ -89,10 +90,10 @@ int main() {
     std::this_thread::sleep_for(1s);
     //can use ranges
     sp << (peoples | std::views::take(3)); // << higher priority than |
-    for (bool p : peoples | std::views::drop(4) | SenderView(sp)){
+    for (bool p : peoples | std::views::drop(4) | std::views::sender(sp)) {
         //p = true, send success
         std::cout << "send ranges:" << std::boolalpha << p << std::endl;
-    };
+    }
     sp->done();
     t.join();
     return 0;

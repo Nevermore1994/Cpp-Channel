@@ -16,7 +16,6 @@
 #include <concepts>
 #include <ranges>
 #include <type_traits>
-#include <string_view>
 
 namespace Async {
 
@@ -103,8 +102,6 @@ struct SendView {
     }
 };
 
-inline constexpr SendView SenderView;
-
 
 template <typename T>
 using SenderPtr = std::unique_ptr<Sender<T>>;
@@ -190,6 +187,17 @@ public:
     constexpr auto operator()(U&& v) -> Sender<T>& {
         send(std::forward<U>(v));
         return *this;
+    }
+
+    template <typename ...Args>
+    inline auto emplace(Args&&... args) -> bool
+        requires std::constructible_from<T, Args...> {
+        if (!channel_->isClosed_) {
+            std::lock_guard<std::mutex> lock(channel_->mutex_);
+            channel_->messages_.emplace_back(std::forward<Args>(args)...);
+            return true;
+        }
+        return false;
     }
 
     template <typename I, typename = std::enable_if_t<std::movable<T>> >
@@ -565,5 +573,9 @@ public:
 }; //end of class ReceiverIterator
 
 } //end of namespace Async
+
+namespace std::ranges::views { // NOLINT(cert-dcl58-cpp)
+    inline constexpr Async::SendView sender;
+}
 
 #endif //end if ASYNC_CHANNEL

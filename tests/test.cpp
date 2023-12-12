@@ -59,7 +59,7 @@ TEST(ChannelTest, PtrSendMultiMessage) {
     });
     std::vector<type> nums(10);
     std::iota(nums.begin(), nums.end(), 0);
-    nums | std::views::take(5) | SenderView(sp);
+    nums | std::views::take(5) | std::views::sender(sp);
     sp << std::move(std::vector<int>{5, 6, 7, 8, 9}) << std::vector<int>{10, 11};
     sp->done();
     t1.join();
@@ -82,7 +82,7 @@ TEST(ChannelTest, RefPtrSendMultiMessage) {
     });
     std::vector<type> nums(10);
     std::iota(nums.begin(), nums.end(), 0);
-    nums | std::views::take(5) | SenderView(ssp);
+    nums | std::views::take(5) | std::views::sender(ssp);
     ssp << std::move(std::vector<int>{5, 6, 7, 8, 9}) << std::list<int>{10, 11};
     ssp->done();
     t1.join();
@@ -131,7 +131,7 @@ TEST(ChannelTest, Range) {
     });
     std::vector<type> nums(10);
     std::iota(nums.begin(), nums.end(), 0);
-    nums | std::views::take(5) | SenderView(sp);
+    nums | std::views::take(5) | std::views::sender(sp);
     sp << std::move(std::vector<int>{5, 6, 7, 8, 9}) << std::list<int>{10, 11};
     sp->done();
     t1.join();
@@ -222,10 +222,6 @@ struct A {
 
 struct TestValue: public A {
     std::string key = "key";
-};
-
-struct B {
-
 };
 
 TEST(ChannelTest, ImplicitConversion) {
