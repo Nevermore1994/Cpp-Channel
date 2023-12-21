@@ -10,7 +10,7 @@
 * Support Ranges
 * No blocking or blocking fetch.
 * Range-based for loop supported.
-* If the sender or receiver is released, the channel will be closed
+* If either the sender or receiver is released, the channel will be closed.
 * Integrates well with STL algorithms in some cases. Eg: std::move(rp->begin(), rp->end(), ...).
 * Tested with GCC(gcc 13), Clang(LLVM 16 and XCode15.0), and MSVC(Visual Studio 2022).
 
@@ -24,7 +24,7 @@ You just need to include the header file [Channel.hpp](Channel.hpp)
 
 ## Usage
 
-* send single message
+* Send
 ```c++
     auto [sp, rp] = Channel<int>::create();
     sp->send(0);
@@ -33,7 +33,7 @@ You just need to include the header file [Channel.hpp](Channel.hpp)
     
 ```
 
-* batch operations
+* Batch operations
 ```c++
     auto [sp, rp] = Channel<int>::create();
     std::vector<int> nums {1, 2, 3, 4, 5, 6, 7};
@@ -45,14 +45,14 @@ You just need to include the header file [Channel.hpp](Channel.hpp)
     // or sp->send(nums | std::views::take(3));
 
     //use | operator
-    for (bool res : nums | std::views::drop(4) | SenderView(sp)){
+    for (bool res : nums | std::views::drop(4) | std::views::sender(sp)){
         //p = true, send success
         std::cout << "send result:" << std::boolalpha << res << std::endl;
     }
     
 ```
 
-* receive message
+* Receive
 ```c++
     auto [sp, rp] = Channel<int>::create();
     //use for range, blocking
@@ -77,7 +77,7 @@ You just need to include the header file [Channel.hpp](Channel.hpp)
     
 ```
 
-* NoBlocking receive message
+* NoBlocking receive
 ```C++
     auto [sp, rp] = Channel<int>::create();
     auto res = rp->tryReceive(); // No blocking

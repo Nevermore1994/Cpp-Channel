@@ -109,13 +109,7 @@ TEST(ChannelTest, Close) {
         using type = std::string;
         auto [sp, rp] = Channel<type>::create();
         sp->done();
-        try {
-            sp << "123"s;
-        } catch (const std::runtime_error& r) {
-            EXPECT_TRUE(true);
-        } catch (...) {
-            EXPECT_TRUE(false);
-        }
+        EXPECT_THROW(sp << "123"s, std::runtime_error);
     }
 }
 
@@ -218,11 +212,58 @@ TEST(ChannelTest, MultiThread) {
 
 struct A {
     int value = 0;
+    virtual ~A() = default;
+    A() = default;
+    A(int value_)
+        : value(value_) {
+
+    }
 };
 
 struct TestValue: public A {
+    TestValue() = default;
+
+    explicit TestValue(const std::string& key_)
+        : key(key_) {
+
+    }
+
+    TestValue(const TestValue& rhs)
+        : A(rhs.value)
+        , key(rhs.key) {
+
+    }
+
+    TestValue& operator=(const TestValue& rhs) {
+        value = rhs.value;
+        key = rhs.key;
+        return *this;
+    }
+
+    TestValue(TestValue&&) = delete;
+    TestValue& operator=(TestValue&&) = delete;
     std::string key = "key";
 };
+
+TEST(ChannelTest, Immovable) {
+    using type = TestValue;
+    auto [sp, rp] = Channel<type>::create();
+    std::thread t1([rp = std::move(rp)]{
+        int value = 0;
+        for(auto res : *rp) {
+            auto k = static_cast<TestValue>(res);
+            EXPECT_EQ(k.value, value);
+            EXPECT_EQ(k.key, std::to_string(value));
+            value++;
+        }
+    });
+    TestValue a;
+    a.key = std::to_string(0);
+    sp << a;
+    sp->done();
+    t1.join();
+    std::expected<TestValue, int> v;
+}
 
 TEST(ChannelTest, ImplicitConversion) {
     using type = A;
@@ -238,6 +279,7 @@ TEST(ChannelTest, ImplicitConversion) {
         }
     });
     std::vector<TestValue*> values;
+    values.begin();
     for (int i = 0; i < 10; i++) {
         auto value = new TestValue();
         value->value = i;

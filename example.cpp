@@ -47,19 +47,21 @@ int main() {
     using namespace std::chrono_literals;
     auto [sp, rp] = Channel<People>::create();
     std::thread t([rp = std::move(rp)] {
-         //can use for range
-//        for (auto& people : *rp) {
-//            std::cout << " receive interval:" << (timestamp() - people.timestamp)
-//                << "ns, age:" << people.age << ", id:" << people.id << std::endl;
-//        }
+        //use for range
+        for (auto& people : *rp) {
+            std::cout << " receive interval:" << (timestamp() - people.timestamp)
+                << "ns, age:" << people.age << ", id:" << people.id << std::endl;
+        }
 
-         //can use ranges
-//        auto func = [](auto& ex) {
-//            return ex.id % 2 == 0;
-//        };
-//        for (const auto& people : *rp | std::views::filter(func)) {
-//           std::cout << " receive interval:" << (timestamp() - people.timestamp) << "ns, age:" << people.age << ", id:" << people.id << std::endl;
-//        }
+        //use ranges
+        for (const auto& people : *rp | std::views::filter([](const auto& ex) {
+            return ex.id % 2 == 0;
+        }) | std::views::transform([](auto& ex) {
+            ex.id += 4;
+            return ex;
+        }) ) {
+           std::cout << " receive interval:" << (timestamp() - people.timestamp) << "ns, age:" << people.age << ", id:" << people.id << std::endl;
+        }
 
         //can use STL algorithm
         std::vector<People> values;
