@@ -24,66 +24,67 @@ You just need to include the header file [Channel.hpp](Channel.hpp)
 
 ## Usage
 
+* Create
+```c++
+    auto [sp, rp] = Channel<int>::create(); //any movable type or support bit copy type
+```
+
 * Send
 ```c++
-    auto [sp, rp] = Channel<int>::create();
     sp->send(0);
     sp << 1;
     sp << 2 << 3;
     
-```
-
-* Batch operations
-```c++
-    auto [sp, rp] = Channel<int>::create();
+    //batch operations
     std::vector<int> nums {1, 2, 3, 4, 5, 6, 7};
     sp << nums; 
     // or sp->send(nums);
     
     //use ranges
-    sp << (nums | std::views::take(3)); // << operator higher priority than | operator
+    sp << (nums | std::views::take(3)); 
     // or sp->send(nums | std::views::take(3));
 
     //use | operator
-    for (bool res : nums | std::views::drop(4) | std::views::sender(sp)){
-        //p = true, send success
+    for (bool res : nums | std::views::drop(4) | std::views::sender(sp)) {
+        //if p = true, send success
         std::cout << "send result:" << std::boolalpha << res << std::endl;
     }
     
+    //close
+    sp->done(); //or sp.reset();
 ```
 
 * Receive
 ```c++
-    auto [sp, rp] = Channel<int>::create();
     //use for range, blocking
-    for (auto& res : *rp) {
+    for (const auto& res : *rp) {
         std::cout << res << std::endl;
     }
     
     //use ranges, blocking
-    auto func = [](auto& num) {
-        return num % 2 == 0;
-    };
-    for (const auto& num : *rp | std::views::filter(func)) {
+    auto func = ;
+    for (const auto& num : *rp | std::views::filter([](const auto& num) { 
+            return num % 2 == 0; 
+        })) {
         std::cout << num << std::endl;
     }
     
-    std::vector<int> values;
     //use STL algorithm, blocking
+    std::vector<int> values;
     std::move(rp->begin(), rp->end(), std::back_inserter(values));
-    for (const auto& res: values) {
-        std::cout << res << std::endl;
-    }
     
-```
-
-* NoBlocking receive
-```C++
-    auto [sp, rp] = Channel<int>::create();
-    auto res = rp->tryReceive(); // No blocking
-    //No blocking
+    //no blocking
+    auto res = rp->tryReceive(); 
+    //no blocking
     for (const auto& res : rp->tryReceiveAll()) {
         std::cout << res << std::endl;  
+    }
+    
+    //can use STL or Ranges
+    for (const auto& res : rp->tryReceiveAll() | std::transform([](const auto& num) {
+            return num + 3;   
+        })) {
+        std::cout << res << std::endl;
     }
 ```
 
