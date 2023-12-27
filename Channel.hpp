@@ -30,7 +30,8 @@ inline constexpr auto IsSTLString = IsSTLStringImpl<T>::value;
 
 template <typename C>
 concept IsRange = std::ranges::viewable_range<C> &&
-    (!IsSTLString<C>) && requires(C&& c) {
+    (!IsSTLString<C>) &&
+    requires(C&& c) {
         std::forward<C>(c).empty();
         typename decltype(c.begin())::value_type;
     };
@@ -47,7 +48,7 @@ template <typename From, typename To>
 concept IsConvertible = std::is_same_v<From, To> || std::is_convertible_v<From, To>;
 
 template <typename T>
-concept IsBitCopyable = std::is_copy_constructible_v<T> && std::is_copy_assignable_v<T>;
+concept BitwiseCopyable = std::is_copy_constructible_v<T> && std::is_copy_assignable_v<T>;
 
 template <typename T>
 class Sender;
@@ -119,13 +120,13 @@ using ReceiverPtr = std::unique_ptr<Receiver<T>>;
 
 enum class ChannelEventType {
     Unknown,
-    Success,
+    Success [[maybe_unused]],
     Closed,
     None,
 };
 
 template <typename T, typename = std::enable_if_t<!std::is_reference_v<T>> >
-requires (std::movable<T> || IsBitCopyable<T>)
+requires (std::movable<T> || BitwiseCopyable<T>)
 class Channel {
 public:
     friend class Sender<T>;
@@ -146,6 +147,7 @@ public:
             cond_.notify_all();
         }
     }
+
     [[nodiscard]] inline auto isDone() noexcept -> bool {
         std::lock_guard<std::mutex> lock(mutex_);
         return isClosed_;
@@ -155,9 +157,9 @@ public:
 
     Channel(Channel&&) = delete;
 
-    Channel& operator=(const Channel&) = delete;
+    auto operator=(const Channel&) -> Channel& = delete;
 
-    Channel& operator=(Channel&&) = delete;
+    auto operator=(Channel&&) -> Channel& = delete;
 
 private:
     Channel() = default;

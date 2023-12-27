@@ -245,7 +245,7 @@ struct TestValue: public A {
     std::string key = "key";
 };
 
-TEST(ChannelTest, Immovable) {
+TEST(ChannelTest, BitwiseCopy) {
     using type = TestValue;
     auto [sp, rp] = Channel<type>::create();
     std::thread t1([rp = std::move(rp)]{
@@ -262,7 +262,6 @@ TEST(ChannelTest, Immovable) {
     sp << a;
     sp->done();
     t1.join();
-    std::expected<TestValue, int> v;
 }
 
 TEST(ChannelTest, ImplicitConversion) {
@@ -279,7 +278,6 @@ TEST(ChannelTest, ImplicitConversion) {
         }
     });
     std::vector<TestValue*> values;
-    values.begin();
     for (int i = 0; i < 10; i++) {
         auto value = new TestValue();
         value->value = i;
