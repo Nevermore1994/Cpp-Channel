@@ -16,10 +16,10 @@ using namespace std::literals;
 TEST(ChannelTest, CheckType) {
     using type = std::string;
     auto [sp, rp] = Channel<type>::create();
-    EXPECT_TRUE((std::is_same_v<GetChannelType<decltype(sp)>::type, type>));
-    EXPECT_TRUE((std::is_same_v<GetChannelType<decltype(rp)>::type, type>));
+    EXPECT_TRUE((std::is_same_v<GetChannelType<decltype(sp)>, type>));
+    EXPECT_TRUE((std::is_same_v<GetChannelType<decltype(rp)>, type>));
     auto ssp = SenderRefPtr<type>(std::move(sp));
-    EXPECT_TRUE((std::is_same_v<GetChannelType<decltype(ssp)>::type, type>));
+    EXPECT_TRUE((std::is_same_v<GetChannelType<decltype(ssp)>, type>));
 }
 
 TEST(ChannelTest, PtrSendSingleMessage) {
@@ -27,6 +27,12 @@ TEST(ChannelTest, PtrSendSingleMessage) {
     auto [sp, rp] = Channel<type>::create();
     std::thread t1([rp = std::move(rp)]{
         type value = 0;
+        int t1, t2;
+        rp >> t1 >> t2;
+        EXPECT_EQ(t1, value);
+        value++;
+        EXPECT_EQ(t2, value);
+        value++;
         for(;;) {
             if (auto res = rp->receive(); res.has_value()) {
                 EXPECT_EQ(*res, value);
@@ -38,6 +44,27 @@ TEST(ChannelTest, PtrSendSingleMessage) {
     });
     for (std::weakly_incrementable auto i : std::views::iota(0,10)) {
         sp << i;
+    }
+    sp->done();
+    t1.join();
+}
+
+TEST(ChannelTest, Receive) {
+    using type = std::string;
+    auto [sp, rp] = Channel<type>::create();
+    std::thread t1([rp = std::move(rp)]{
+        int value = 0;
+        for(;;) {
+            if (auto res = rp->receive(); res.has_value()) {
+                EXPECT_EQ(*res, std::to_string(value));
+                value++;
+            } else {
+                break;
+            }
+        }
+    });
+    for(std::weakly_incrementable auto i : std::views::iota(0, 10)) {
+        sp << std::to_string(i);
     }
     sp->done();
     t1.join();
@@ -110,6 +137,8 @@ TEST(ChannelTest, Close) {
         auto [sp, rp] = Channel<type>::create();
         sp->done();
         EXPECT_THROW(sp << "123"s, std::runtime_error);
+        std::string s;
+        EXPECT_THROW(rp >> s, std::runtime_error);
     }
 }
 

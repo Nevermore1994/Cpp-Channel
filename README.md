@@ -5,7 +5,7 @@
 ### Thread-safe container for sharing data between threads. Header-only.
 
 * Thread-safe push and fetch.
-* Use stream operators to push (<<) items.
+* Use stream operators to push (<<) and fetch (>>) items.
 * Support Batch operations.
 * Support Ranges
 * No blocking or blocking fetch.
@@ -56,6 +56,9 @@ You just need to include the header file [Channel.hpp](Channel.hpp)
 
 * Receive
 ```c++
+    auto t = *(rp->receive());
+    int t1, t2;
+    rp >> t1 >> t2;
     //use for range, blocking
     for (const auto& res : *rp) {
         std::cout << res << std::endl;

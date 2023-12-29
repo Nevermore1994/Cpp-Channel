@@ -40,6 +40,10 @@ struct People {
         , id(id_) {
 
     }
+
+    People() {
+
+    }
 };
 
 int main() {
@@ -48,6 +52,8 @@ int main() {
     auto [sp, rp] = Channel<People>::create();
     std::thread t([rp = std::move(rp)] {
         //use for range
+        People p;
+        rp >> p;
         for (auto& people : *rp) {
             std::cout << " receive interval:" << (timestamp() - people.timestamp)
                 << "ns, age:" << people.age << ", id:" << people.id << std::endl;

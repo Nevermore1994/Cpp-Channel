@@ -38,17 +38,20 @@ concept IsRange = std::ranges::viewable_range<C> &&
 
 template <typename I>
     requires requires(I&&) {
-        typename I::element_type::ValueType;
+        typename std::remove_cvref_t<I>::element_type::ValueType;
     }
-struct GetChannelType {
-    using type = I::element_type::ValueType;
+struct GetChannelTypeImpl {
+    using type = std::remove_cvref_t<I>::element_type::ValueType;
 };
+
+template<typename I>
+using GetChannelType = typename GetChannelTypeImpl<I>::type;
 
 template <typename From, typename To>
 concept IsConvertible = std::is_same_v<From, To> || std::is_convertible_v<From, To>;
 
 template <typename T>
-concept BitwiseCopyable = std::is_copy_constructible_v<T> && std::is_copy_assignable_v<T>;
+concept CanCopyable = std::is_copy_constructible_v<T> && std::is_copy_assignable_v<T>;
 
 template <typename T>
 class Sender;
@@ -126,7 +129,7 @@ enum class ChannelEventType {
 };
 
 template <typename T, typename = std::enable_if_t<!std::is_reference_v<T>> >
-requires (std::movable<T> || BitwiseCopyable<T>)
+requires (std::movable<T> || CanCopyable<T>)
 class Channel {
 public:
     friend class Sender<T>;
@@ -275,73 +278,37 @@ namespace _detail {
     };
 }
 
-template <typename T, typename U>
-auto operator<<(const SenderPtr<U>& sender, T&& message) -> const SenderPtr<U>&
-requires std::movable<T> && IsConvertible<T, U> {
-    if (!sender->send(std::forward<T>(message))) {
+template <typename U>
+auto operator<<(const IsSenderPtr auto& sender, U&& message) -> const IsSenderPtr auto&
+requires std::movable<U> && IsConvertible<GetChannelType<decltype(sender)>, U> {
+    if (!sender->send(std::forward<U>(message))) {
         _detail::closedHandler();
     }
     return sender;
 }
 
-template <typename T, typename U>
-auto operator<<(const SenderPtr<U>& sender, const T& message) -> const SenderPtr<U>&
-requires std::is_copy_constructible_v<T> && IsConvertible<T, U> {
+template <typename U>
+auto operator<<(const IsSenderPtr auto& sender, const U& message) -> const IsSenderPtr auto&
+requires std::is_copy_constructible_v<U> && IsConvertible<GetChannelType<decltype(sender)>, U> {
     if (!sender->send(message)) {
         _detail::closedHandler();
     }
     return sender;
 }
 
-template <typename I, typename U>
-auto operator<<(const SenderPtr<U>& sender, const I& box) -> const SenderPtr<U>&
-requires IsRange<I> && IsConvertible<typename decltype(box.begin())::value_type, U> {
+template <typename U>
+auto operator<<(const IsSenderPtr auto& sender, const U& box) -> const IsSenderPtr auto&
+requires IsRange<U> && IsConvertible<typename decltype(box.begin())::value_type, GetChannelType<decltype(sender)>> {
     if (!sender->send(box)) {
         _detail::closedHandler();
     }
     return sender;
 }
 
-template <typename I, typename U>
-auto operator<<(const SenderPtr<U>& sender, I&& box) -> const SenderPtr<U>&
-requires IsRange<I> && IsConvertible<typename decltype(box.begin())::value_type, U> {
-    if (!sender->send(std::forward<I>(box))) {
-        _detail::closedHandler();
-    }
-    return sender;
-}
-
-template <typename T, typename U>
-auto operator<<(const SenderRefPtr<U>& sender, T&& message) -> const SenderRefPtr<U>&
-requires std::movable<T> && IsConvertible<T, U> {
-    if (!sender->send(std::forward<T>(message))) {
-        _detail::closedHandler();
-    }
-    return sender;
-}
-
-template <typename T, typename U>
-auto operator<<(const SenderRefPtr<U>& sender, const T& message) -> const SenderRefPtr<U>&
-requires std::is_copy_constructible_v<U> && IsConvertible<T, U> {
-    if (!sender->send(message)) {
-        _detail::closedHandler();
-    }
-    return sender;
-}
-
-template <typename I, typename U>
-auto operator<<(const SenderRefPtr<U>& sender, const I& box) -> const SenderRefPtr<U>&
-requires IsRange<I> && IsConvertible<typename decltype(box.begin())::value_type, U> {
-    if (!sender->send(box)) {
-        _detail::closedHandler();
-    }
-    return sender;
-}
-
-template <typename I, typename U>
-auto operator<<(const SenderRefPtr<U>& sender, I&& box) -> const SenderRefPtr<U>&
-requires IsRange<I> && IsConvertible<typename decltype(box.begin())::value_type, U> {
-    if (!sender->send(std::forward<I>(box))) {
+template <typename U>
+auto operator<<(const IsSenderPtr auto& sender, U&& box) -> const IsSenderPtr auto&
+requires IsRange<U> && IsConvertible<typename decltype(box.begin())::value_type, GetChannelType<decltype(sender)>> {
+    if (!sender->send(std::forward<U>(box))) {
         _detail::closedHandler();
     }
     return sender;
@@ -501,6 +468,31 @@ public:
     }
 
 }; //end of class Receiver
+
+template <typename U>
+auto operator>>(const IsReceiverPtr auto& receiver, U& value) -> const IsReceiverPtr auto&
+requires std::movable<U> && IsConvertible<GetChannelType<decltype(receiver)> , U> {
+    auto res = receiver->receive();
+    if (res.has_value()) {
+        value = std::move(*res);
+    } else if (res.error() == ChannelEventType::Closed) {
+        _detail::closedHandler();
+    }
+    return receiver;
+}
+
+template <typename U>
+auto operator>>(const IsReceiverPtr auto& receiver, U& value) -> const IsReceiverPtr auto&
+requires std::is_copy_assignable_v<U> && (!std::movable<U>) && IsConvertible<GetChannelType<decltype(receiver)>, U> {
+    auto res = receiver->receive();
+    if (res.has_value()) {
+        value = *res;
+    } else if (res.error() == ChannelEventType::Closed) {
+        _detail::closedHandler();
+    }
+    return receiver;
+}
+
 
 template <typename T>
 class ReceiverIterator {
