@@ -307,7 +307,11 @@ TEST(ChannelTest, ImplicitConversion) {
         }
     });
     std::vector<TestValue*> values;
-    for (int i = 0; i < 10; i++) {
+    auto value = new TestValue();
+    value->value = 0;
+    value->key = std::to_string(0);
+    sp << value;
+    for (int i = 1; i < 10; i++) {
         auto value = new TestValue();
         value->value = i;
         value->key = std::to_string(i);
