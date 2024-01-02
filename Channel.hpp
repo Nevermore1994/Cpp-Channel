@@ -238,7 +238,7 @@ public:
 
     template <typename U>
     inline auto send(const U& message) noexcept -> bool
-    requires std::is_copy_constructible_v<T> && IsConvertible<T, U> {
+    requires std::is_copy_constructible_v<T> && IsConvertible<U, T> {
         std::lock_guard<std::mutex> lock(channel_->mutex_);
         if (!channel_->isClosed_) {
             channel_->messages_.push_back(message);
@@ -250,7 +250,7 @@ public:
 
     template <typename U>
     inline auto send(U&& message) noexcept -> bool
-    requires std::movable<T> && IsConvertible<T, U> {
+    requires std::movable<T> && IsConvertible<U, T> {
         std::lock_guard<std::mutex> lock(channel_->mutex_);
         if (!channel_->isClosed_) {
             channel_->messages_.emplace_back(std::forward<U>(message));
@@ -280,7 +280,7 @@ namespace _detail {
 
 template <typename U>
 auto operator<<(const IsSenderPtr auto& sender, U&& message) -> const IsSenderPtr auto&
-requires std::movable<U> && IsConvertible<GetChannelType<decltype(sender)>, U> {
+requires std::movable<U> && IsConvertible<U, GetChannelType<decltype(sender)>> {
     if (!sender->send(std::forward<U>(message))) {
         _detail::closedHandler();
     }
@@ -289,7 +289,7 @@ requires std::movable<U> && IsConvertible<GetChannelType<decltype(sender)>, U> {
 
 template <typename U>
 auto operator<<(const IsSenderPtr auto& sender, const U& message) -> const IsSenderPtr auto&
-requires std::is_copy_constructible_v<U> && IsConvertible<GetChannelType<decltype(sender)>, U> {
+requires std::is_copy_constructible_v<U> && IsConvertible<U, GetChannelType<decltype(sender)>> {
     if (!sender->send(message)) {
         _detail::closedHandler();
     }
