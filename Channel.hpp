@@ -280,7 +280,7 @@ namespace _detail {
 
 template <typename U>
 auto operator<<(const IsSenderPtr auto& sender, U&& message) -> const IsSenderPtr auto&
-requires std::movable<U> && IsConvertible<GetChannelType<decltype(sender)>, U> {
+requires std::movable<U> && IsConvertible<U, GetChannelType<decltype(sender)>> {
     if (!sender->send(std::forward<U>(message))) {
         _detail::closedHandler();
     }
@@ -289,7 +289,7 @@ requires std::movable<U> && IsConvertible<GetChannelType<decltype(sender)>, U> {
 
 template <typename U>
 auto operator<<(const IsSenderPtr auto& sender, const U& message) -> const IsSenderPtr auto&
-requires std::is_copy_constructible_v<U> && IsConvertible<GetChannelType<decltype(sender)>, U> {
+requires std::is_copy_constructible_v<U> && IsConvertible<U, GetChannelType<decltype(sender)>> {
     if (!sender->send(message)) {
         _detail::closedHandler();
     }
