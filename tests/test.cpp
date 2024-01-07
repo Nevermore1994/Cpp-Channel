@@ -311,8 +311,8 @@ TEST(ChannelTest, ImplicitConversion) {
     sp << value;
     for (int i = 1; i < 10; i++) {
         auto tmepValue = new TestValue();
-        value->value = i;
-        value->key = std::to_string(i);
+        tmepValue->value = i;
+        tmepValue->key = std::to_string(i);
         values.emplace_back(tmepValue);
     }
     sp << std::move(values);

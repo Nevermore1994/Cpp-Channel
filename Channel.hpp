@@ -93,7 +93,7 @@ public:
     }
 
     template <std::ranges::viewable_range InputView>
-    friend auto operator|(InputView &&lhs, SenderAdaptorClosure<S> self) {
+    friend auto operator|(InputView&& lhs, SenderAdaptorClosure<S> self) {
         auto res = self.sender_->send(std::forward<InputView>(lhs));
         return std::ranges::single_view<bool>(res);
     }
