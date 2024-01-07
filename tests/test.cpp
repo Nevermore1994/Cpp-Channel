@@ -251,44 +251,42 @@ struct A {
 
 struct TestValue: public A {
     TestValue() = default;
-
+    ~TestValue() override = default;
     explicit TestValue(const std::string& key_)
         : key(key_) {
 
     }
 
-    TestValue(const TestValue& rhs)
+    TestValue(TestValue&& rhs) noexcept
         : A(rhs.value)
-        , key(rhs.key) {
+        , key(std::move(rhs.key)) {
 
     }
 
-    TestValue& operator=(const TestValue& rhs) {
+    TestValue& operator=(TestValue&& rhs) noexcept {
         value = rhs.value;
-        key = rhs.key;
+        key = std::move(key);
         return *this;
     }
-
-    TestValue(TestValue&&) = delete;
-    TestValue& operator=(TestValue&&) = delete;
+    TestValue(const TestValue&) = default;
+    TestValue& operator=(const TestValue& rhs) = default;
     std::string key = "key";
 };
 
 TEST(ChannelTest, BitwiseCopy) {
     using type = TestValue;
-    auto [sp, rp] = Channel<type>::create();
+    auto [sp, rp] = Channel<TestValue>::create();
     std::thread t1([rp = std::move(rp)]{
         int value = 0;
-        for(auto res : *rp) {
-            auto k = static_cast<TestValue>(res);
-            EXPECT_EQ(k.value, value);
-            EXPECT_EQ(k.key, std::to_string(value));
+        for(auto& res : *rp) {
+            EXPECT_EQ(res.value, value);
+            EXPECT_EQ(res.key, std::to_string(value));
             value++;
         }
     });
     TestValue a;
     a.key = std::to_string(0);
-    sp << a;
+    sp << std::move(a);
     sp->done();
     t1.join();
 }
@@ -312,12 +310,12 @@ TEST(ChannelTest, ImplicitConversion) {
     value->key = std::to_string(0);
     sp << value;
     for (int i = 1; i < 10; i++) {
-        auto value = new TestValue();
+        auto tmepValue = new TestValue();
         value->value = i;
         value->key = std::to_string(i);
-        values.emplace_back(value);
+        values.emplace_back(tmepValue);
     }
-    sp << values;
+    sp << std::move(values);
     sp->done();
     t1.join();
 }
