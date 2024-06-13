@@ -65,7 +65,6 @@ You just need to include the header file [Channel.hpp](Channel.hpp)
     }
     
     //use ranges, blocking
-    auto func = ;
     for (const auto& num : *rp | std::views::filter([](const auto& num) { 
             return num % 2 == 0; 
         })) {
